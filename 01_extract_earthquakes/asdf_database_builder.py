@@ -82,7 +82,7 @@ for _i, station_name in enumerate(sta_list):
         # Call the function to split up the waveform data
         waveform_info = waveform_sep(waveform)
 
-        #print waveform_info
+        # print waveform_info
 
         new_waveform = Waveforms(full_id=waveform_info[0], station_id=waveform_info[1], starttime=waveform_info[2], endtime=waveform_info[3], tag=waveform_info[4])
 
