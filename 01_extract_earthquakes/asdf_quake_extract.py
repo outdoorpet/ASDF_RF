@@ -11,12 +11,12 @@ from sqlalchemy import Column, Integer, String
 from sqlalchemy import or_, and_
 from obspy.core import Stream
 
-#### =========================== User Input Required =========================== ####
+# =========================== User Input Required =========================== #
 
 # FDSN network identifier (2 Characters)
 network = '8B'
 
-#### =========================================================================== ####
+# =========================================================================== #
 
 Base = declarative_base()
 
