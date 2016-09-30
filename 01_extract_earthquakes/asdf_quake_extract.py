@@ -2,7 +2,7 @@
 # them in the ASDF file.
 
 import pyasdf
-from os.path import expanduser
+from os.path import expanduser, join
 import sys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -13,8 +13,14 @@ from obspy.core import Stream
 
 # =========================== User Input Required =========================== #
 
+#Path to the data
+data_path = '/media/obsuser/seismic_data_1/'
+
+#IRIS Virtual Ntework name
+virt_net = '_GA_test'
+
 # FDSN network identifier (2 Characters)
-network = '8B'
+FDSNnetwork = 'XX'
 
 # =========================================================================== #
 
@@ -31,7 +37,7 @@ class Waveforms(Base):
     full_id = Column(String(250), nullable=False, primary_key=True)
 
 # ASDF file (High Performance Dataset) one file per network
-ASDF_in = expanduser('~') + '/Desktop/DATA/' + network + '/ASDF/' + network + '.h5'
+ASDF_in = join(data_path, virt_net, FDSNnetwork, 'ASDF', FDSNnetwork + '.h5')
 
 # Open the ASDF file
 ds = pyasdf.ASDFDataSet(ASDF_in)
@@ -50,7 +56,7 @@ for _i, station_name in enumerate(sta_list):
     sta_helper = ds.waveforms[station_name]
 
     # SQL file for station
-    SQL_in = expanduser('~') + '/Desktop/DATA/' + network + '/ASDF/' + station_name + '.db'
+    SQL_in = join(data_path, virt_net, FDSNnetwork, 'ASDF', station_name.split('.')[1] + '.db')
 
     # Initialize the sqlalchemy sqlite engine
     engine = create_engine('sqlite:////' + SQL_in)
@@ -58,8 +64,8 @@ for _i, station_name in enumerate(sta_list):
     Session = sessionmaker(bind=engine)
     session = Session()
 
-    for instance in session.query(Waveforms):
-        print instance.full_id
+    #for instance in session.query(Waveforms):
+    #    print instance.full_id
 
     for _j, event in enumerate(event_cat):
         #print '\r  Extracting {0} of {1} Earthquakes....'.format(_j + 1, event_cat.count()),
@@ -81,7 +87,7 @@ for _i, station_name in enumerate(sta_list):
                 filter(or_(and_(Waveforms.starttime <= qtime, qtime < Waveforms.endtime), and_(qtime <= Waveforms.starttime, Waveforms.starttime < qtime + 3600))):
             # Now extract all matched waveforms, concatenate using Obspy and write to ASDF with associated event tag
             # Read in the HDF5 matched waveforms into obspy stream (merge them together)
-            print matched_waveform.full_id
+            #print matched_waveform.full_id
 
             # Open up the waveform into an obspy stream object
             # (this will join to previous waveform if there are multiple mSQL matches)
@@ -90,9 +96,14 @@ for _i, station_name in enumerate(sta_list):
         # Attempt to merge all traces with matching ID'S in place
         st.merge()
 
+        # Now call function to trim each trace so that the earthquake arrives at 900 seconds (15 mins)
+
+        print sta_helper.StationXML
+        event_latitude = origin_info.latitude
+        event_longitude = origin_info.longitude
 
 
-
+        break
 
 
 

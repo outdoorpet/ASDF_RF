@@ -20,16 +20,16 @@ code_start_time = time.time()
 data_path = '/media/obsuser/seismic_data_1/'
 
 #IRIS Virtual Ntework name
-virt_net = '_GA_OBS'
+virt_net = '_GA_test'
 
 # FDSN network identifier (2 Characters)
-FDSNnetwork = '8B'
+FDSNnetwork = 'XX'
 
 # =========================================================================== #
 
 path_XML = join(data_path, virt_net, FDSNnetwork, 'network_metadata/stnXML', FDSNnetwork+ '.xml')
 path_miniSEED = join(data_path, virt_net, FDSNnetwork, 'raw_SEED/')
-path_quakeML = join(data_path, virt_net, FDSNnetwork, 'event_metadata/quakeML/')
+path_quakeML = join(data_path, virt_net, FDSNnetwork, 'event_metadata/earthquake/quakeML/')
 
 # Output ASDF file (High Performance Dataset) one file per network
 ASDF_out = join(data_path, virt_net, FDSNnetwork, 'ASDF', FDSNnetwork + '.h5')
@@ -39,6 +39,9 @@ ds = pyasdf.ASDFDataSet(ASDF_out, compression="gzip-3")
 
 # Add the station XML data to the ASDF file
 ds.add_stationxml(path_XML)
+
+# Add the earthquake quakeML data if it exists
+#ds.add_quakeml(
 
 # Set up the sql waveform databases
 Base = declarative_base()
@@ -66,8 +69,10 @@ def waveform_sep(ws):
 
 
 # Get a list of miniseed files in raw_SEED directory
-seed_files = glob.glob(path_miniSEED + '*.msd')[0:100]
+seed_files = glob.glob(path_miniSEED + '*EH*') #[0:100]
 seed_files.sort()
+
+#print seed_files
 
 # Iterate through the miniseed files, fix the header values and add waveforms
 for _i, filename in enumerate(seed_files):
@@ -75,7 +80,7 @@ for _i, filename in enumerate(seed_files):
     print "\r Adding file ", _i + 1, ' of ', len(seed_files), ' ....',
     sys.stdout.flush()
 
-    station_name = basename(filename).split('_')[0]
+    #station_name = basename(filename).split('_')[0]
 
     #print station_name
 
@@ -85,9 +90,11 @@ for _i, filename in enumerate(seed_files):
     # there will only be one trace in stream because the data is by channels
     tr = st[0]
 
+    station_name = tr.stats.station
+
     # Makes sure header is correct
     tr.stats.network = FDSNnetwork
-    tr.stats.station = station_name
+    #tr.stats.station = station_name
     tr.stats.channel = 'B' + tr.stats.channel[1:]
 
     ds.add_waveforms(tr, tag="raw_recording")
