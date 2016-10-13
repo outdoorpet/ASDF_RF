@@ -24,6 +24,8 @@ ASDF_in = join(data_path, virt_net, FDSNnetwork, 'ASDF', FDSNnetwork + '.h5')
 # Open the ASDF file
 ds = pyasdf.ASDFDataSet(ASDF_in)
 
+print ds
+
 # Access the event metadata
 event_cat = ds.events
 
@@ -39,7 +41,9 @@ for _j, event in enumerate(event_cat):
     print '...'
     print 'qtime = ', origin_info.time, qtime
 
-    for station in ds.ifilter(ds.q.starttime <= [qtime, qtime+3600], ds.q.starttime <= qtime, qtime < ds.q.endtime)
+    for station in ds.ifilter(ds.q.starttime <= [qtime, qtime+3600]):#, qtime < ds.q.endtime, ds.q.tag == "raw_recording"):
+        print station
+
 
     break
 

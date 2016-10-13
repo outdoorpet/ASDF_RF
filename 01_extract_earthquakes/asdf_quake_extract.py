@@ -2,7 +2,7 @@
 # them in the ASDF file.
 
 import pyasdf
-from os.path import expanduser, join
+from os.path import join
 import sys
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -47,6 +47,8 @@ event_cat = ds.events
 
 # Get list of stations in ASDF file
 sta_list = ds.waveforms.list()
+
+print sta_list
 
 # Iterate through all stations in ASDF file
 for _i, station_name in enumerate(sta_list):
@@ -102,6 +104,9 @@ for _i, station_name in enumerate(sta_list):
         event_latitude = origin_info.latitude
         event_longitude = origin_info.longitude
 
+
+        # Now calculate estimated arrival time of earthquake
+        print sta_helper.channel_coordinates
 
         break
 
