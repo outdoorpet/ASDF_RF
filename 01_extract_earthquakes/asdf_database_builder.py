@@ -72,17 +72,22 @@ def waveform_sep(ws):
 seed_files = glob.glob(path_miniSEED + '*EH*') #[0:100]
 seed_files.sort()
 
-#print seed_files
+# counter for number of files already in ASDF file
+pre_exist_count = 0
 
 # Iterate through the miniseed files, fix the header values and add waveforms
 for _i, filename in enumerate(seed_files):
 
-    print "\r Adding file ", _i + 1, ' of ', len(seed_files), ' ....',
+    print "\r Parsing miniseed file ", _i + 1, ' of ', len(seed_files), ' ....',
     sys.stdout.flush()
 
-    #station_name = basename(filename).split('_')[0]
+    #check to see the filename is in stnd format
+    if not '_' in basename(filename):
+        print 'file is not standard name'
+        print basename(filename)
+        continue
 
-    #print station_name
+    station_name = basename(filename).split('_')[0]
 
     # read the miniseed file
     st = read(filename)
@@ -90,14 +95,13 @@ for _i, filename in enumerate(seed_files):
     # there will only be one trace in stream because the data is by channels
     tr = st[0]
 
-    station_name = tr.stats.station
+    #station_name = tr.stats.station
 
     # Makes sure header is correct
     tr.stats.network = FDSNnetwork
-    #tr.stats.station = station_name
+    tr.stats.station = station_name
     tr.stats.channel = 'B' + tr.stats.channel[1:]
 
-    ds.add_waveforms(tr, tag="raw_recording")
 
     # Make the data name for the waveform so that we can add it to the SQL database
     data_name = "{net}.{sta}.{loc}.{cha}__{start}__{end}__{tag}".format(
@@ -109,20 +113,20 @@ for _i, filename in enumerate(seed_files):
         end=tr.stats.endtime.strftime("%Y-%m-%dT%H:%M:%S"),
         tag="raw_recording")
 
+
     #SQL filename for station
     SQL_out = join(data_path, virt_net, FDSNnetwork, 'ASDF', station_name + '.db')
 
+    # Open and create the SQL file
+    # Create an engine that stores data
+    engine = create_engine('sqlite:////' + SQL_out)
+
     #check if SQL file exists:
     if not exists(SQL_out):
-        # Open and create the SQL file
-        # Create an engine that stores data
-        engine = create_engine('sqlite:////' + SQL_out)
-
         # Create all tables in the engine
         Base.metadata.create_all(engine)
 
     # The ASDF formatted waveform name [full_id, station_id, starttime, endtime, tag]
-
     waveform_info = waveform_sep(data_name)
     #print waveform_info
 
@@ -132,15 +136,29 @@ for _i, filename in enumerate(seed_files):
     Session.configure(bind=engine)
     session = Session()
 
-    # Add the waveform info to the session
-    session.add(new_waveform)
-    session.commit()
+    query = session.query(Waveforms).filter(Waveforms.full_id == waveform_info[0]).one_or_none()
+
+    if query == None:
+
+        # Add the waveform info to the session
+        session.add(new_waveform)
+        session.commit()
+
+
+        # Add waveform to the ASDF file
+        ds.add_waveforms(tr, tag="raw_recording")
+
+    elif not query == None:
+        pre_exist_count += 1
+
 
 
 
 del ds
 print '\n'
 print("--- Execution time: %s seconds ---" % (time.time() - code_start_time))
+print '--- Pre-existing files = ', pre_exist_count, '---'
+print '--- Added ', len(seed_files)-pre_exist_count, ' waveforms to ASDF file ---'
 
 
 
