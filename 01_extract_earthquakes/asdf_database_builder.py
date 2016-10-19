@@ -1,6 +1,7 @@
 # Script to build the ASDF SQL data base using sqlalchemy (seperate database for each station in a network)
 # This will be done automatically on ASDF creation in the future
 
+
 import pyasdf
 from os.path import join, exists, basename
 import glob
@@ -40,8 +41,11 @@ ds = pyasdf.ASDFDataSet(ASDF_out, compression="gzip-3")
 # Add the station XML data to the ASDF file
 ds.add_stationxml(path_XML)
 
-# Add the earthquake quakeML data if it exists
-#ds.add_quakeml(
+quake_files = glob.glob(path_quakeML + '*xml*')
+
+# Add earthquake quakeML data
+for quake in quake_files:
+    ds.add_quakeml(quake)
 
 # Set up the sql waveform databases
 Base = declarative_base()
@@ -57,6 +61,17 @@ class Waveforms(Base):
     tag = Column(String(250), nullable=False)
     full_id = Column(String(250), nullable=False, primary_key=True)
 
+#function to create the ASDF waveform ID tag
+def make_ASDF_tag(tr, tag):
+    data_name = "{net}.{sta}.{loc}.{cha}__{start}__{end}__{tag}".format(
+        net=tr.stats.network,
+        sta=tr.stats.station,
+        loc=tr.stats.location,
+        cha=tr.stats.channel,
+        start=tr.stats.starttime.strftime("%Y-%m-%dT%H:%M:%S"),
+        end=tr.stats.endtime.strftime("%Y-%m-%dT%H:%M:%S"),
+        tag=tag)
+    return data_name
 
 # Function to seperate the waveform string into seperate fields
 def waveform_sep(ws):
@@ -102,18 +117,6 @@ for _i, filename in enumerate(seed_files):
     tr.stats.station = station_name
     tr.stats.channel = 'B' + tr.stats.channel[1:]
 
-
-    # Make the data name for the waveform so that we can add it to the SQL database
-    data_name = "{net}.{sta}.{loc}.{cha}__{start}__{end}__{tag}".format(
-        net=tr.stats.network,
-        sta=tr.stats.station,
-        loc=tr.stats.location,
-        cha=tr.stats.channel,
-        start=tr.stats.starttime.strftime("%Y-%m-%dT%H:%M:%S"),
-        end=tr.stats.endtime.strftime("%Y-%m-%dT%H:%M:%S"),
-        tag="raw_recording")
-
-
     #SQL filename for station
     SQL_out = join(data_path, virt_net, FDSNnetwork, 'ASDF', station_name + '.db')
 
@@ -127,7 +130,7 @@ for _i, filename in enumerate(seed_files):
         Base.metadata.create_all(engine)
 
     # The ASDF formatted waveform name [full_id, station_id, starttime, endtime, tag]
-    waveform_info = waveform_sep(data_name)
+    waveform_info = waveform_sep(make_ASDF_tag(tr, "raw_recording"))
     #print waveform_info
 
     new_waveform = Waveforms(full_id=waveform_info[0], station_id=waveform_info[1], starttime=waveform_info[2], endtime=waveform_info[3], tag=waveform_info[4])
