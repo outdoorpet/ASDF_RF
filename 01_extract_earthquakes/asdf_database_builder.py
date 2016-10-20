@@ -43,9 +43,17 @@ ds.add_stationxml(path_XML)
 
 quake_files = glob.glob(path_quakeML + '*xml*')
 
+added_quakes_count = 0
+
 # Add earthquake quakeML data
 for quake in quake_files:
-    ds.add_quakeml(quake)
+    try:
+        ds.add_quakeml(quake)
+    except ValueError:
+        continue
+    else:
+        added_quakes_count += 1
+
 
 # Set up the sql waveform databases
 Base = declarative_base()
@@ -159,9 +167,9 @@ for _i, filename in enumerate(seed_files):
 del ds
 print '\n'
 print("--- Execution time: %s seconds ---" % (time.time() - code_start_time))
-print '--- Pre-existing files = ', pre_exist_count, '---'
+print '--- Pre-existing waveforms = ', pre_exist_count, '---'
 print '--- Added ', len(seed_files)-pre_exist_count, ' waveforms to ASDF file ---'
-print '--- Added ', len(quake_files), ' quakeML file(s) to ASDF file ---'
+print '--- Added ', added_quakes_count, ' quakeML file(s) to ASDF file ---'
 
 
 
