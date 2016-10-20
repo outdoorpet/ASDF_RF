@@ -21,7 +21,7 @@ code_start_time = time.time()
 data_path = '/media/obsuser/seismic_data_1/'
 
 #IRIS Virtual Ntework name
-virt_net = '_GA_test'
+virt_net = '_GA_test_tmp'
 
 # FDSN network identifier (2 Characters)
 FDSNnetwork = 'XX'
@@ -147,7 +147,6 @@ for _i, filename in enumerate(seed_files):
         session.add(new_waveform)
         session.commit()
 
-
         # Add waveform to the ASDF file
         ds.add_waveforms(tr, tag="raw_recording")
 
@@ -162,6 +161,7 @@ print '\n'
 print("--- Execution time: %s seconds ---" % (time.time() - code_start_time))
 print '--- Pre-existing files = ', pre_exist_count, '---'
 print '--- Added ', len(seed_files)-pre_exist_count, ' waveforms to ASDF file ---'
+print '--- Added ', len(quake_files), ' quakeML file(s) to ASDF file ---'
 
 
 

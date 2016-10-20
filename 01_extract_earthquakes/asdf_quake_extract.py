@@ -25,7 +25,7 @@ code_start_time = time.time()
 data_path = '/media/obsuser/seismic_data_1/'
 
 #IRIS Virtual Ntework name
-virt_net = '_GA_test'
+virt_net = '_GA_test_tmp'
 
 # FDSN network identifier (2 Characters)
 FDSNnetwork = 'XX'
@@ -127,6 +127,7 @@ for _i, station_name in enumerate(sta_list):
                 filter(or_(and_(Waveforms.starttime <= qtime, qtime < Waveforms.endtime),
                            and_(qtime <= Waveforms.starttime, Waveforms.starttime < qtime + 3600)),
                        Waveforms.full_id.like('%raw_recording%')):
+
             # Now extract all matched waveforms, concatenate using Obspy and write to ASDF with associated event tag
             # Read in the HDF5 matched waveforms into obspy stream (merge them together)
             #print matched_waveform.full_id
@@ -147,6 +148,7 @@ for _i, station_name in enumerate(sta_list):
         event_latitude = origin_info.latitude
         event_longitude = origin_info.longitude
         event_depth = origin_info.depth
+
 
         # Now calculate estimated arrival time of earthquake
         # first calculate distance and azimuthsm, returns (dist (m), faz, baz)
