@@ -21,7 +21,7 @@ code_start_time = time.time()
 data_path = '/media/obsuser/seismic_data_1/'
 
 #IRIS Virtual Ntework name
-virt_net = '_GA_test_tmp'
+virt_net = '_GA_ANUtest'
 
 # FDSN network identifier (2 Characters)
 FDSNnetwork = 'XX'
@@ -29,11 +29,22 @@ FDSNnetwork = 'XX'
 # =========================================================================== #
 
 path_XML = join(data_path, virt_net, FDSNnetwork, 'network_metadata/stnXML', FDSNnetwork+ '.xml')
-path_miniSEED = join(data_path, virt_net, FDSNnetwork, 'raw_SEED/')
+path_DATA = join(data_path, virt_net, FDSNnetwork, 'raw_DATA/')
 path_quakeML = join(data_path, virt_net, FDSNnetwork, 'event_metadata/earthquake/quakeML/')
 
 # Output ASDF file (High Performance Dataset) one file per network
 ASDF_out = join(data_path, virt_net, FDSNnetwork, 'ASDF', FDSNnetwork + '.h5')
+
+# text file containing list of service directories already in ASDF file
+service_SQL = join(data_path, virt_net, FDSNnetwork, 'ASDF', FDSNnetwork + '_proc.txt')
+
+if not exists(service_SQL):
+    service_SQL_entries = []
+if exists(service_SQL):
+    # open up the text file for appending
+    with open(service_SQL, 'r') as f:
+        service_SQL_entries = f.readlines()
+
 
 # Create the ASDF file
 ds = pyasdf.ASDFDataSet(ASDF_out, compression="gzip-3")
@@ -91,85 +102,100 @@ def waveform_sep(ws):
     return (ws.encode('ascii'), a[0].encode('ascii'), starttime, endtime, a[3].encode('ascii'))
 
 
-# Get a list of miniseed files in raw_SEED directory
-seed_files = glob.glob(path_miniSEED + '*EH*') #[0:100]
-seed_files.sort()
+# Get a list of service directories
+service_dir_list = glob.glob(path_DATA + '*service*')
 
-# counter for number of files already in ASDF file
-pre_exist_count = 0
+waveforms_added = 0
 
-# Iterate through the miniseed files, fix the header values and add waveforms
-for _i, filename in enumerate(seed_files):
+#iterate through service directories
+for service in service_dir_list:
 
-    print "\r Parsing miniseed file ", _i + 1, ' of ', len(seed_files), ' ....',
-    sys.stdout.flush()
-
-    #check to see the filename is in stnd format
-    if not '_' in basename(filename):
-        print 'file is not standard name'
-        print basename(filename)
+    # Check to see if the service directory has already been processed
+    if basename(service)+'\n' in service_SQL_entries:
         continue
 
-    station_name = basename(filename).split('_')[0]
 
-    # read the miniseed file
-    st = read(filename)
+    print '\r Processing: ', basename(service)
 
-    # there will only be one trace in stream because the data is by channels
-    tr = st[0]
+    # write the service name to the text file
+    savefile = open(service_SQL, 'a+')
+    savefile.write(basename(service)+'\n')
+    savefile.close()
 
-    #station_name = tr.stats.station
+    station_dir_list = glob.glob(service+'/*')
 
-    # Makes sure header is correct
-    tr.stats.network = FDSNnetwork
-    tr.stats.station = station_name
-    tr.stats.channel = 'B' + tr.stats.channel[1:]
+    #iterate through station directories
+    for station_path in station_dir_list:
 
-    #SQL filename for station
-    SQL_out = join(data_path, virt_net, FDSNnetwork, 'ASDF', station_name + '.db')
+        station_name = basename(station_path)
 
-    # Open and create the SQL file
-    # Create an engine that stores data
-    engine = create_engine('sqlite:////' + SQL_out)
+        seed_files = glob.glob(join(station_path, '*miniSEED/*EH*'))
 
-    #check if SQL file exists:
-    if not exists(SQL_out):
-        # Create all tables in the engine
-        Base.metadata.create_all(engine)
+        if seed_files == []:
+            continue
 
-    # The ASDF formatted waveform name [full_id, station_id, starttime, endtime, tag]
-    waveform_info = waveform_sep(make_ASDF_tag(tr, "raw_recording"))
-    #print waveform_info
+        print '\r Working on station: ', station_name
 
-    new_waveform = Waveforms(full_id=waveform_info[0], station_id=waveform_info[1], starttime=waveform_info[2], endtime=waveform_info[3], tag=waveform_info[4])
+        waveforms_added += len(seed_files)
 
-    # Initiate a session with the SQL database so that we can add data to it
-    Session.configure(bind=engine)
-    session = Session()
+        # Iterate through the miniseed files, fix the header values and add waveforms
+        for _i, filename in enumerate(seed_files):
 
-    query = session.query(Waveforms).filter(Waveforms.full_id == waveform_info[0]).one_or_none()
+            print "\r     Parsing miniseed file ", _i + 1, ' of ', len(seed_files), ' ....',
+            sys.stdout.flush()
 
-    if query == None:
+            # read the miniseed file
+            st = read(filename)
 
-        # Add the waveform info to the session
-        session.add(new_waveform)
-        session.commit()
+            # there will only be one trace in stream because the data is by channels
+            tr = st[0]
 
-        # Add waveform to the ASDF file
-        ds.add_waveforms(tr, tag="raw_recording")
+            # Makes sure header is correct
+            tr.stats.network = FDSNnetwork
+            tr.stats.station = station_name
+            tr.stats.channel = 'B' + tr.stats.channel[1:]
 
-    elif not query == None:
-        pre_exist_count += 1
+            #SQL filename for station
+            SQL_out = join(data_path, virt_net, FDSNnetwork, 'ASDF', station_name + '.db')
 
+            # Open and create the SQL file
+            # Create an engine that stores data
+            engine = create_engine('sqlite:////' + SQL_out)
+
+            #check if SQL file exists:
+            if not exists(SQL_out):
+                # Create all tables in the engine
+                Base.metadata.create_all(engine)
+
+            # The ASDF formatted waveform name [full_id, station_id, starttime, endtime, tag]
+            waveform_info = waveform_sep(make_ASDF_tag(tr, "raw_recording"))
+            #print waveform_info
+
+            new_waveform = Waveforms(full_id=waveform_info[0], station_id=waveform_info[1], starttime=waveform_info[2], endtime=waveform_info[3], tag=waveform_info[4])
+
+            # Initiate a session with the SQL database so that we can add data to it
+            Session.configure(bind=engine)
+            session = Session()
+
+            #query = session.query(Waveforms).filter(Waveforms.full_id == waveform_info[0]).one_or_none()
+
+            #if query == None:
+
+            # Add the waveform info to the session
+            session.add(new_waveform)
+            session.commit()
+
+            # Add waveform to the ASDF file
+            ds.add_waveforms(tr, tag="raw_recording")
+
+            #elif not query == None:
+            #    pre_exist_count += 1
 
 
 
 del ds
 print '\n'
 print("--- Execution time: %s seconds ---" % (time.time() - code_start_time))
-print '--- Pre-existing waveforms = ', pre_exist_count, '---'
-print '--- Added ', len(seed_files)-pre_exist_count, ' waveforms to ASDF file ---'
+print '--- Added ', waveforms_added, ' waveforms to ASDF file ---'
 print '--- Added ', added_quakes_count, ' quakeML file(s) to ASDF file ---'
-
-
 
