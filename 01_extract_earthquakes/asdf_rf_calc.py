@@ -8,7 +8,7 @@ from obspy.core import AttribDict
 from obspy.geodetics.base import gps2dist_azimuth
 from matplotlib.pyplot import plot
 
-from rf import RFStream, rfstats
+from rf import RFStream, rfstats, get_profile_boxes
 
 import time
 
@@ -18,40 +18,17 @@ code_start_time = time.time()
 # =========================== User Input Required =========================== #
 
 #Path to the data
-data_path = '/media/obsuser/seismic_data_1/'
+data_path = '/media/obsuser/GA-ANU_TRAN/'
 
 #IRIS Virtual Ntework name
-virt_net = '_GA_ANUtest'
+virt_net = '_ANU'
 
 # FDSN network identifier (2 Characters)
-FDSNnetwork = 'XX'
+FDSNnetwork = 'S1'
 
-station = 'GA3'
+station = 'AQ3A1'
 
 # =========================================================================== #
-
-
-#function to rotate N and E component data into Radial Transverse
-def ZRT_rot_trace(tr_Z, tr_N, tr_E, baz_actual):
-
-    DN_data = tr_N.data
-    DE_data = tr_E.data
-
-    # use rotate to rotate the north and east to radial and transverse
-    rotated_data = rotate_ne_rt(DN_data, DE_data, baz_actual)
-
-    tr_rad = Trace(data=rotated_data[0], header=tr_N.stats)
-    tr_tran = Trace(data=rotated_data[1], header=tr_N.stats)
-
-    # update channel names
-    tr_rad.stats.channel = 'BHR'
-    tr_tran.stats.channel = 'BHT'
-
-    rot_st = Stream(traces = [tr_Z, tr_N, tr_E])
-
-    return rot_st
-
-
 
 
 # ASDF file (High Performance Dataset) one file per network
@@ -91,54 +68,21 @@ for _j, event in enumerate(event_cat):
                     tr.stats.update(stats)
 
                 rf_stream.filter('bandpass', freqmin=0.05, freqmax=1.)
-                rf_stream.rf(method='P', trim=(-10,30), downsample=50, deconvolve='freq')
+                rf_stream.rf(method='P', trim=(-10,30), downsample=50, deconvolve='time')
+
+                rf_stream.moveout()
+                rf_stream.ppoints(pp_depth=30)
 
                 all_rf_stream.extend(rf_stream)
 
-    #if _j > 2:
-    #    break
 
 
-all_rf_stream.select(station=station, channel='BHT').plot_rf(fillcolors=(None, 'k'))
+all_rf_stream.sort(keys=['distance'])
+all_rf_stream.select(station=station, channel='BHL').plot_rf(fillcolors=(None, 'k'))
 
+#all_rf_stream.profile(boxes=get_profile_boxes(latlon0=(-35.344265, 149.159866), azimuth=10, bins=(0,10,20,30)))
 
-
-
-
-
-
-'''
-
-# Access the event metadata
-event_cat = ds.events
-
-# Get list of stations in ASDF file
-sta_list = ds.waveforms.list()
-
-# Iterate through all stations in ASDF file
-for _i, station_name in enumerate(sta_list):
-    print '\r'
-    print 'Working on Station: ', station_name, ' ....'
-    # Get the helper object to access the station waveforms
-    #sta_helper = ds.waveforms[station_name]
-
-    #get list of all tags for station
-    #tag_list = sta_helper.get_waveform_tags()
-
-    #if 'extracted_unproc_quakes' in tag_list:
-        # stream with all event traces for station (i.e. all components)
-        #st = sta_helper.extracted_unproc_quakes
-        #print st.__str__(extended=True)
-
-    #for event_waveform in ds.ifilter(ds.q.station == station_name, )
-
-
-
-
-    break
-
-'''
-
+#all_rf_stream.plot_profile()
 
 del ds
 print '\n'

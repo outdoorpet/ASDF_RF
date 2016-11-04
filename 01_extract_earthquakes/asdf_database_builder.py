@@ -46,7 +46,7 @@ if exists(service_SQL):
         service_SQL_entries = f.readlines()
 
 
-# Create the ASDF file
+# Create/open the ASDF file
 ds = pyasdf.ASDFDataSet(ASDF_out, compression="gzip-3")
 
 # Add the station XML data to the ASDF file
@@ -56,14 +56,14 @@ quake_files = glob.glob(path_quakeML + '*xml*')
 
 added_quakes_count = 0
 
+if not ds.events.count() == 0:
+    # remove earthquake info
+    del ds.events
+
 # Add earthquake quakeML data
 for quake in quake_files:
-    try:
-        ds.add_quakeml(quake)
-    except ValueError:
-        continue
-    else:
-        added_quakes_count += 1
+    ds.add_quakeml(quake)
+    added_quakes_count += 1
 
 
 # Set up the sql waveform databases

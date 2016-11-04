@@ -25,7 +25,7 @@ code_start_time = time.time()
 data_path = '/media/obsuser/seismic_data_1/'
 
 #IRIS Virtual Ntework name
-virt_net = '_GA_test_tmp'
+virt_net = '_GA_ANUtest'
 
 # FDSN network identifier (2 Characters)
 FDSNnetwork = 'XX'
@@ -150,8 +150,9 @@ for _i, station_name in enumerate(sta_list):
         event_depth = origin_info.depth
 
 
+
         # Now calculate estimated arrival time of earthquake
-        # first calculate distance and azimuthsm, returns (dist (m), faz, baz)
+        # first calculate distance and azimuths, returns (dist (m), faz, baz)
         dist_info = gps2dist_azimuth(event_latitude, event_longitude, sta_helper.coordinates['latitude'], sta_helper.coordinates['longitude'])
 
         #epicentral distance
@@ -159,10 +160,16 @@ for _i, station_name in enumerate(sta_list):
 
         arrivals = model.get_ray_paths(source_depth_in_km=event_depth/1000.0, distance_in_degree=ep_dist, phase_list=["P", "pP", "S"])
 
-        # now trim the st object to make 1 hr period so that the P -wave will arriva at 900 seconds into the trace
+        if arrivals == []:
+            # No arrivals found
+            continue
+
+        # now trim the st object to make 1 hr period so that the P -wave will arrive at 900 seconds into the trace
         trace_starttime = (origin_info.time + arrivals[0].time) - 900
 
         st.trim(starttime=trace_starttime, endtime=trace_starttime+3600, pad=True, fill_value=0)
+
+        #st.plot()
 
         for tr in st:
             # The ASDF formatted waveform name [full_id, station_id, starttime, endtime, tag]
