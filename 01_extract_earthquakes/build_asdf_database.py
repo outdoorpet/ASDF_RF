@@ -1,3 +1,4 @@
+import pyasdf
 from os.path import join, exists, basename
 import glob
 import sys
@@ -24,7 +25,11 @@ FDSNnetwork = 'S1'
 
 # =========================================================================== #
 
-path_DATA = join(data_path, virt_net, FDSNnetwork, 'raw_DATA/')
+# Output ASDF file (High Performance Dataset) one file per network
+ASDF_in = join(data_path, virt_net, FDSNnetwork, 'ASDF', FDSNnetwork + '.h5')
+
+# Create/open the ASDF file
+ds = pyasdf.ASDFDataSet(ASDF_in, compression="gzip-3")
 
 # Set up the sql waveform databases
 Base = declarative_base()
@@ -40,17 +45,6 @@ class Waveforms(Base):
     tag = Column(String(250), nullable=False)
     full_id = Column(String(250), nullable=False, primary_key=True)
 
-#function to create the ASDF waveform ID tag
-def make_ASDF_tag(tr, tag):
-    data_name = "{net}.{sta}.{loc}.{cha}__{start}__{end}__{tag}".format(
-        net=tr.stats.network,
-        sta=tr.stats.station,
-        loc=tr.stats.location,
-        cha=tr.stats.channel,
-        start=tr.stats.starttime.strftime("%Y-%m-%dT%H:%M:%S"),
-        end=tr.stats.endtime.strftime("%Y-%m-%dT%H:%M:%S"),
-        tag=tag)
-    return data_name
 
 # Function to seperate the waveform string into seperate fields
 def waveform_sep(ws):
@@ -61,83 +55,58 @@ def waveform_sep(ws):
     # Returns: (station_id, starttime, endtime, waveform_tag)
     return (ws.encode('ascii'), a[0].encode('ascii'), starttime, endtime, a[3].encode('ascii'))
 
-
-
-
-# Get a list of service directories
-year_dir_list = glob.glob(path_DATA + '*')
-year_dir_list.sort()
-
+# Get list of stations in ASDF file
+sta_list = ds.waveforms.list()
 
 waveforms_added = 0
 
-#iterate through service directories
-for year in year_dir_list:
 
-    if not basename(year) == '2016':
-        continue
+# Iterate through all stations in ASDF file
+for _i, station_name in enumerate(sta_list):
+    print '\r'
+    print 'Working on Station: ', station_name, ' ....'
+    # Get the helper object to access the station waveforms
+    sta_helper = ds.waveforms[station_name]
 
-    print '\r Processing: ', basename(year)
+    waveforms_list = sta_helper.list()
 
-    day_dir_list = glob.glob(year+'/*')
-    day_dir_list.sort()
+    waveforms_added += len(waveforms_list)
 
-    #iterate through day directories
-    for day_path in day_dir_list:
+    # Iterate through the miniseed files, fix the header values and add waveforms
+    for _i, waveform_tag in enumerate(waveforms_list):
 
-        day_name = basename(day_path)
+        print "\r     Parsing miniseed file ", _i + 1, ' of ', len(waveforms_list), ' ....', waveform_tag,
+        sys.stdout.flush()
 
-        seed_files = glob.glob(join(day_path, '*BH*'))
+        #SQL filename for station
+        SQL_out = join(data_path, virt_net, FDSNnetwork, 'ASDF', station_name + '.db')
 
-        if seed_files == []:
-            continue
+        # Open and create the SQL file
+        # Create an engine that stores data
+        engine = create_engine('sqlite:////' + SQL_out)
 
-        if not day_name == '011':
-            continue
+        #check if SQL file exists:
+        if not exists(SQL_out):
+            # Create all tables in the engine
+            Base.metadata.create_all(engine)
 
-        print '\r Working on Day: ', day_name
+        # The ASDF formatted waveform name [full_id, station_id, starttime, endtime, tag]
+        waveform_info = waveform_sep(waveform_tag)
+        #print waveform_info
 
-        waveforms_added += len(seed_files)
+        new_waveform = Waveforms(full_id=waveform_info[0], station_id=waveform_info[1], starttime=waveform_info[2], endtime=waveform_info[3], tag=waveform_info[4])
 
-        # Iterate through the miniseed files, fix the header values and add waveforms
-        for _i, filename in enumerate(seed_files):
+        # Initiate a session with the SQL database so that we can add data to it
+        Session.configure(bind=engine)
+        session = Session()
 
-            print "\r     Parsing miniseed file ", _i + 1, ' of ', len(seed_files), ' ....',
-            sys.stdout.flush()
+        # Add the waveform info to the session
+        session.add(new_waveform)
+        session.commit()
 
-            # read the miniseed file
-            st = read(filename)
+    break
 
-            # there will only be one trace in stream because the data is by channels
-            tr = st[0]
-
-            #SQL filename for station
-            SQL_out = join(data_path, virt_net, FDSNnetwork, 'ASDF', tr.stats.station + '.db')
-
-            # Open and create the SQL file
-            # Create an engine that stores data
-            engine = create_engine('sqlite:////' + SQL_out)
-
-            #check if SQL file exists:
-            if not exists(SQL_out):
-                # Create all tables in the engine
-                Base.metadata.create_all(engine)
-
-            # The ASDF formatted waveform name [full_id, station_id, starttime, endtime, tag]
-            waveform_info = waveform_sep(make_ASDF_tag(tr, "raw_recording"))
-            #print waveform_info
-
-            new_waveform = Waveforms(full_id=waveform_info[0], station_id=waveform_info[1], starttime=waveform_info[2], endtime=waveform_info[3], tag=waveform_info[4])
-
-            # Initiate a session with the SQL database so that we can add data to it
-            Session.configure(bind=engine)
-            session = Session()
-
-            # Add the waveform info to the session
-            session.add(new_waveform)
-            session.commit()
-
-
+del ds
 print '\n'
 print("--- Execution time: %s seconds ---" % (time.time() - code_start_time))
 print '--- Added ', waveforms_added, ' waveforms to ASDF Database ---'
