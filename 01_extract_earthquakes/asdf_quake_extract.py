@@ -74,9 +74,12 @@ def waveform_sep(ws):
 
 # ASDF file (High Performance Dataset) one file per network
 ASDF_in = join(data_path, virt_net, FDSNnetwork, 'ASDF', FDSNnetwork + '.h5')
+# Output ASDF file just events
+ASDF_out = join(data_path, virt_net, FDSNnetwork, 'ASDF', FDSNnetwork +'_quakes' + '.h5')
 
 # Open the ASDF file
 ds = pyasdf.ASDFDataSet(ASDF_in)
+ds_out = pyasdf.ASDFDataSet(ASDF_out)
 
 # Access the event metadata
 event_cat = ds.events
@@ -92,6 +95,12 @@ for _i, station_name in enumerate(sta_list):
     print 'Working on Station: ', station_name, ' ....'
     # Get the helper object to access the station waveforms
     sta_helper = ds.waveforms[station_name]
+
+    # Copy over inventory object
+    try:
+        ds_out.add_stationxml(sta_helper.StationXML)
+    except:
+        continue
 
     # SQL file for station
     SQL_in = join(data_path, virt_net, FDSNnetwork, 'ASDF', station_name.split('.')[1] + '.db')
@@ -114,6 +123,12 @@ for _i, station_name in enumerate(sta_list):
     for _j, event in enumerate(event_cat):
         print '\r  Extracting {0} of {1} Earthquakes'.format(_j + 1, event_cat.count()),
         sys.stdout.flush()
+
+        # copy event catalogue to ASDF_out
+        try:
+            ds_out.add_quakeml(event)
+        except:
+            pass
 
         # Get quake origin info
         origin_info = event.preferred_origin() or event.origins[0]
@@ -169,26 +184,27 @@ for _i, station_name in enumerate(sta_list):
 
         st.trim(starttime=trace_starttime, endtime=trace_starttime+3600, pad=True, fill_value=0)
 
+        try:
+            # add the traces back into ASDF file referenced to the quake
+            ds_out.add_waveforms(st, tag='extracted_unproc_quakes', event_id=event)
+
+            files_added += 1
+        except:
+            continue
+
         #st.plot()
 
-        for tr in st:
+        #for tr in st:
             # The ASDF formatted waveform name [full_id, station_id, starttime, endtime, tag]
-            waveform_info = waveform_sep(make_ASDF_tag(tr, 'extracted_unproc_quakes'))
+            #waveform_info = waveform_sep(make_ASDF_tag(tr, 'extracted_unproc_quakes'))
 
-            new_waveform = Waveforms(full_id=waveform_info[0], station_id=waveform_info[1], starttime=waveform_info[2],
-                                     endtime=waveform_info[3], tag=waveform_info[4])
+            #new_waveform = Waveforms(full_id=waveform_info[0], station_id=waveform_info[1], starttime=waveform_info[2],
+                                     #endtime=waveform_info[3], tag=waveform_info[4])
 
-            query = session.query(Waveforms).filter(Waveforms.full_id == waveform_info[0]).one_or_none()
+            #query = session.query(Waveforms).filter(Waveforms.full_id == waveform_info[0]).one_or_none()
 
-            if query == None:
-                # Add the waveform info to the session
-                session.add(new_waveform)
-                session.commit()
+            #if query == None:
 
-                # add the traces back into ASDF file referenced to the quake
-                ds.add_waveforms(tr, tag='extracted_unproc_quakes', event_id=event)
-
-                files_added += 1
 
 
 
