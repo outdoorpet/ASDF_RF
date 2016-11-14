@@ -1,5 +1,5 @@
-# Script to build the ASDF SQL data base using sqlalchemy (seperate database for each station in a network)
-# This will be done automatically on ASDF creation in the future
+# Script to write ASDF file from miniseed files also build the ASDF SQL data base
+# using sqlalchemy (separate database for each station in a network)
 
 
 import pyasdf
@@ -17,10 +17,10 @@ code_start_time = time.time()
 
 # =========================== User Input Required =========================== #
 
-#Path to the data
+# Path to the data
 data_path = '/media/obsuser/seismic_data_1/'
 
-#IRIS Virtual Ntework name
+# IRIS Virtual Ntework name
 virt_net = '_GA_ANUtest'
 
 # FDSN network identifier (2 Characters)
@@ -28,7 +28,7 @@ FDSNnetwork = 'XX'
 
 # =========================================================================== #
 
-path_XML = join(data_path, virt_net, FDSNnetwork, 'network_metadata/stnXML', FDSNnetwork+ '.xml')
+path_XML = join(data_path, virt_net, FDSNnetwork, 'network_metadata/stnXML', FDSNnetwork + '.xml')
 path_DATA = join(data_path, virt_net, FDSNnetwork, 'raw_DATA/')
 path_quakeML = join(data_path, virt_net, FDSNnetwork, 'event_metadata/earthquake/quakeML/')
 
@@ -44,7 +44,6 @@ if exists(service_SQL):
     # open up the text file for appending
     with open(service_SQL, 'r') as f:
         service_SQL_entries = f.readlines()
-
 
 # Create/open the ASDF file
 ds = pyasdf.ASDFDataSet(ASDF_out, compression="gzip-3")
@@ -65,10 +64,10 @@ for quake in quake_files:
     ds.add_quakeml(quake)
     added_quakes_count += 1
 
-
 # Set up the sql waveform databases
 Base = declarative_base()
 Session = sessionmaker()
+
 
 class Waveforms(Base):
     __tablename__ = 'waveforms'
@@ -80,7 +79,8 @@ class Waveforms(Base):
     tag = Column(String(250), nullable=False)
     full_id = Column(String(250), nullable=False, primary_key=True)
 
-#function to create the ASDF waveform ID tag
+
+# function to create the ASDF waveform ID tag
 def make_ASDF_tag(tr, tag):
     data_name = "{net}.{sta}.{loc}.{cha}__{start}__{end}__{tag}".format(
         net=tr.stats.network,
@@ -91,6 +91,7 @@ def make_ASDF_tag(tr, tag):
         end=tr.stats.endtime.strftime("%Y-%m-%dT%H:%M:%S"),
         tag=tag)
     return data_name
+
 
 # Function to seperate the waveform string into seperate fields
 def waveform_sep(ws):
@@ -107,24 +108,23 @@ service_dir_list = glob.glob(path_DATA + '*service*')
 
 waveforms_added = 0
 
-#iterate through service directories
+# iterate through service directories
 for service in service_dir_list:
 
     # Check to see if the service directory has already been processed
-    if basename(service)+'\n' in service_SQL_entries:
+    if basename(service) + '\n' in service_SQL_entries:
         continue
-
 
     print '\r Processing: ', basename(service)
 
     # write the service name to the text file
     savefile = open(service_SQL, 'a+')
-    savefile.write(basename(service)+'\n')
+    savefile.write(basename(service) + '\n')
     savefile.close()
 
-    station_dir_list = glob.glob(service+'/*')
+    station_dir_list = glob.glob(service + '/*')
 
-    #iterate through station directories
+    # iterate through station directories
     for station_path in station_dir_list:
 
         station_name = basename(station_path)
@@ -155,31 +155,27 @@ for service in service_dir_list:
             tr.stats.station = station_name
             tr.stats.channel = 'B' + tr.stats.channel[1:]
 
-            #SQL filename for station
+            # SQL filename for station
             SQL_out = join(data_path, virt_net, FDSNnetwork, 'ASDF', station_name + '.db')
 
             # Open and create the SQL file
             # Create an engine that stores data
             engine = create_engine('sqlite:////' + SQL_out)
 
-            #check if SQL file exists:
+            # check if SQL file exists:
             if not exists(SQL_out):
                 # Create all tables in the engine
                 Base.metadata.create_all(engine)
 
             # The ASDF formatted waveform name [full_id, station_id, starttime, endtime, tag]
             waveform_info = waveform_sep(make_ASDF_tag(tr, "raw_recording"))
-            #print waveform_info
 
-            new_waveform = Waveforms(full_id=waveform_info[0], station_id=waveform_info[1], starttime=waveform_info[2], endtime=waveform_info[3], tag=waveform_info[4])
+            new_waveform = Waveforms(full_id=waveform_info[0], station_id=waveform_info[1], starttime=waveform_info[2],
+                                     endtime=waveform_info[3], tag=waveform_info[4])
 
             # Initiate a session with the SQL database so that we can add data to it
             Session.configure(bind=engine)
             session = Session()
-
-            #query = session.query(Waveforms).filter(Waveforms.full_id == waveform_info[0]).one_or_none()
-
-            #if query == None:
 
             # Add the waveform info to the session
             session.add(new_waveform)
@@ -188,14 +184,8 @@ for service in service_dir_list:
             # Add waveform to the ASDF file
             ds.add_waveforms(tr, tag="raw_recording")
 
-            #elif not query == None:
-            #    pre_exist_count += 1
-
-
-
 del ds
 print '\n'
 print("--- Execution time: %s seconds ---" % (time.time() - code_start_time))
 print '--- Added ', waveforms_added, ' waveforms to ASDF file ---'
 print '--- Added ', added_quakes_count, ' quakeML file(s) to ASDF file ---'
-
