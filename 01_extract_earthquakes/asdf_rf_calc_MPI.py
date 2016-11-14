@@ -1,12 +1,17 @@
-# Calculate receiver functions for the earhquakes in the ASDF file.
-# Parallel version
-
-
 import pyasdf
 from os.path import join, exists
 from os import remove as rm
+from obspy.core import Stream, Trace
+from obspy.signal.rotate import rotate_ne_rt
+import sys
+from operator import itemgetter, attrgetter
+from obspy.core import AttribDict
+from obspy.geodetics.base import gps2dist_azimuth
+from matplotlib.pyplot import plot
 
 from rf import RFStream, rfstats, get_profile_boxes
+
+
 
 from collections import defaultdict
 
@@ -15,12 +20,13 @@ import time
 
 code_start_time = time.time()
 
+
 # =========================== User Input Required =========================== #
 
-# Path to the data
-data_path = '/media/obsuser/seismic_data_1/'
+#Path to the data
+data_path = '/g/data/ha3/'
 
-# IRIS Virtual Ntework name
+#IRIS Virtual Ntework name
 virt_net = '_GA_ANUtest'
 
 # FDSN network identifier (2 Characters)
@@ -40,16 +46,16 @@ if exists(ASDF_out):
 # Open the ASDF file
 ds = pyasdf.ASDFDataSet(ASDF_in)
 
-# get event catalogue
+#get event catalogue
 event_cat = ds.events
 
-
 def process_RF(st, inv):
+
     station_name = st[0].stats.station
 
     all_stn_RF = RFStream()
 
-    # make dictionary of lists containing indexes of the traces with the same referred event
+    # make dictinary of lists containing indexes of the traces with the same referred event
     event_dict = defaultdict(list)
     for _i, tr in enumerate(st):
         event_dict[tr.stats.asdf.event_ids[0]].append(_i)
@@ -86,15 +92,16 @@ def process_RF(st, inv):
             rf_stream.ppoints(pp_depth=30)
             all_stn_RF.extend(rf_stream)
 
-    # sort the streams by epicentral distance
+
     all_stn_RF.sort(keys=['distance'])
-    # plot the receiver functions
     all_stn_RF.select(station=station_name, channel='BHL').plot_rf(fillcolors=(None, 'k'))
     return all_stn_RF
 
 
-ds.process(process_function=process_RF, output_filename=ASDF_out,
-           tag_map={'extracted_unproc_quakes': 'receiver_function'})
+
+ds.process(process_function=process_RF, output_filename=ASDF_out, tag_map={'extracted_unproc_quakes': 'receiver_function'})
+
+
 
 del ds
 print '\n'

@@ -10,7 +10,7 @@ code_start_time = time.time()
 # =========================== User Input Required =========================== #
 
 #Path to the data
-data_path = '/media/obsuser/GA-ANU_TRAN/'
+data_path = '/g/data/ha3/'
 
 #IRIS Virtual Ntework name
 virt_net = '_ANU'
@@ -25,8 +25,6 @@ ASDF_in = join(data_path, virt_net, FDSNnetwork, 'ASDF', FDSNnetwork + '.h5')
 
 # Open the ASDF file
 ds = pyasdf.ASDFDataSet(ASDF_in)
-
-print ds
 
 # Access the event metadata
 event_cat = ds.events
@@ -46,7 +44,6 @@ for _j, event in enumerate(event_cat):
     print 'qtime = ', origin_info.time, qtime
 
     event_latitude = origin_info.latitude
-    event_longitude = origin_info.longitude
     event_depth = origin_info.depth
 
     #extract 30 mins before and 2 hours after earthquake origin time
@@ -70,9 +67,5 @@ del ds
 print '\n'
 print("--- Execution time: %s seconds ---" % (time.time() - code_start_time))
 print '--- Added ', files_added, ' earthquake waveforms to ASDF file ---'
-
-
-
-
 
 

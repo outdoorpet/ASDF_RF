@@ -15,7 +15,7 @@ code_start_time = time.time()
 # =========================== User Input Required =========================== #
 
 #Path to the data
-data_path = '/media/obsuser/GA-ANU_TRAN/'
+data_path = '/g/data/ha3/'
 
 #IRIS Virtual Ntework name
 virt_net = '_ANU'
@@ -55,11 +55,11 @@ def waveform_sep(ws):
     # Returns: (station_id, starttime, endtime, waveform_tag)
     return (ws.encode('ascii'), a[0].encode('ascii'), starttime, endtime, a[3].encode('ascii'))
 
+
 # Get list of stations in ASDF file
 sta_list = ds.waveforms.list()
 
 waveforms_added = 0
-
 
 # Iterate through all stations in ASDF file
 for _i, station_name in enumerate(sta_list):
@@ -75,7 +75,11 @@ for _i, station_name in enumerate(sta_list):
     # Iterate through the miniseed files, fix the header values and add waveforms
     for _i, waveform_tag in enumerate(waveforms_list):
 
-        print "\r     Parsing miniseed file ", _i + 1, ' of ', len(waveforms_list), ' ....', waveform_tag,
+        # ignore stationxml
+        if 'StationXML' in waveform_tag:
+            continue
+
+        print "\r     Parsing miniseed file ", _i + 1, ' of ', len(waveforms_list), ' ....',
         sys.stdout.flush()
 
         #SQL filename for station
@@ -104,7 +108,6 @@ for _i, station_name in enumerate(sta_list):
         session.add(new_waveform)
         session.commit()
 
-    break
 
 del ds
 print '\n'
