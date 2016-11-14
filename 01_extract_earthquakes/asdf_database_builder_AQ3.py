@@ -1,5 +1,8 @@
-# Script to build the ASDF SQL data base using sqlalchemy (seperate database for each station in a network)
-# This will be done automatically on ASDF creation in the future
+# Script to write ASDF file from miniseed files also build the ASDF SQL data base
+# using sqlalchemy (separate database for each station in a network)
+# special script for the AQ3 survey and its' unique raw data structure
+
+
 
 
 import pyasdf
@@ -17,10 +20,10 @@ code_start_time = time.time()
 
 # =========================== User Input Required =========================== #
 
-#Path to the data
+# Path to the data
 data_path = '/media/obsuser/GA-ANU_TRAN/'
 
-#IRIS Virtual Ntework name
+# IRIS Virtual Ntework name
 virt_net = '_ANU'
 
 # FDSN network identifier (2 Characters)
@@ -28,7 +31,7 @@ FDSNnetwork = 'S1'
 
 # =========================================================================== #
 
-path_XML = join(data_path, virt_net, FDSNnetwork, 'network_metadata/stnXML', FDSNnetwork+ '.xml')
+path_XML = join(data_path, virt_net, FDSNnetwork, 'network_metadata/stnXML', FDSNnetwork + '.xml')
 path_DATA = join(data_path, virt_net, FDSNnetwork, 'raw_DATA/')
 path_quakeML = join(data_path, virt_net, FDSNnetwork, 'event_metadata/earthquake/quakeML/')
 
@@ -58,18 +61,17 @@ for quake in quake_files:
 year_dir_list = glob.glob(path_DATA + '*')
 year_dir_list.sort()
 
-
 waveforms_added = 0
 
-#iterate through service directories
+# iterate through service directories
 for year in year_dir_list:
 
     print '\r Processing: ', basename(year)
 
-    day_dir_list = glob.glob(year+'/*')
+    day_dir_list = glob.glob(year + '/*')
     day_dir_list.sort()
 
-    #iterate through day directories
+    # iterate through day directories
     for day_path in day_dir_list:
 
         day_name = basename(day_path)
