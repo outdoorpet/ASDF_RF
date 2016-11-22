@@ -124,12 +124,13 @@ for service in service_dir_list:
 
     station_dir_list = glob.glob(service + '/*')
 
+
     # iterate through station directories
     for station_path in station_dir_list:
 
         station_name = basename(station_path)
 
-        seed_files = glob.glob(join(station_path, '*miniSEED/*EH*'))
+        seed_files = glob.glob(join(station_path, '*miniSEED/*'))# '*miniSEED/*.mseed*'))
 
         if seed_files == []:
             continue
@@ -150,10 +151,12 @@ for service in service_dir_list:
             # there will only be one trace in stream because the data is by channels
             tr = st[0]
 
+            station_name = tr.stats.station
+
             # Makes sure header is correct
             tr.stats.network = FDSNnetwork
             tr.stats.station = station_name
-            tr.stats.channel = 'B' + tr.stats.channel[1:]
+            #tr.stats.channel = 'BH' + tr.stats.channel[1:]
 
             # SQL filename for station
             SQL_out = join(data_path, virt_net, FDSNnetwork, 'ASDF', station_name + '.db')

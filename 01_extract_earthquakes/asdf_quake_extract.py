@@ -186,7 +186,7 @@ for _i, station_name in enumerate(sta_list):
 
         try:
             # add the traces back into ASDF file referenced to the quake
-            ds_out.add_waveforms(st, tag='extracted_unproc_quakes', event_id=event)
+            ds_out.add_waveforms(st, tag='unproc_quakes', event_id=event)
 
             files_added += 1
         except:
