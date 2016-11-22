@@ -1,16 +1,12 @@
 import pyasdf
 from os.path import join, exists
 from os import remove as rm
-from obspy.core import Stream, Trace
-from obspy.signal.rotate import rotate_ne_rt
-import sys
-from operator import itemgetter, attrgetter
-from obspy.core import AttribDict
-from obspy.geodetics.base import gps2dist_azimuth
-from matplotlib.pyplot import plot
-
-from rf import RFStream, rfstats, get_profile_boxes
-
+import matplotlib.pyplot as plt
+from rf import RFStream, rfstats
+from rf.imaging import plot_profile_map
+from rf.profile import get_profile_boxes
+import numpy as np
+import glob
 
 
 from collections import defaultdict
@@ -27,10 +23,10 @@ code_start_time = time.time()
 data_path = '/g/data/ha3/'
 
 #IRIS Virtual Ntework name
-virt_net = '_GA_ANUtest'
+virt_net = '_ANU'
 
 # FDSN network identifier (2 Characters)
-FDSNnetwork = 'XX'
+FDSNnetwork = 'AA'
 
 # =========================================================================== #
 
@@ -38,6 +34,7 @@ FDSNnetwork = 'XX'
 # ASDF quakes file (High Performance Dataset) one file per network
 ASDF_in = join(data_path, virt_net, FDSNnetwork, 'ASDF', FDSNnetwork + '_quakes' + '.h5')
 ASDF_out = join(data_path, virt_net, FDSNnetwork, 'ASDF', FDSNnetwork + '_RF' + '.h5')
+
 
 # remove the output if it exists
 if exists(ASDF_out):
@@ -49,13 +46,18 @@ ds = pyasdf.ASDFDataSet(ASDF_in)
 #get event catalogue
 event_cat = ds.events
 
+#for event in event_cat:
+#    if '3329830' in str(event.resource_id):
+#        print event.resource_id
+
+
 def process_RF(st, inv):
 
     station_name = st[0].stats.station
 
     all_stn_RF = RFStream()
 
-    # make dictinary of lists containing indexes of the traces with the same referred event
+    # make dictionary of lists containing indexes of the traces with the same referred event
     event_dict = defaultdict(list)
     for _i, tr in enumerate(st):
         event_dict[tr.stats.asdf.event_ids[0]].append(_i)
@@ -77,7 +79,17 @@ def process_RF(st, inv):
 
         rf_stream = RFStream(traces=[st[event_dict[event_key][0]], st[event_dict[event_key][1]],
                                      st[event_dict[event_key][2]]])
-        stats = rfstats(station=inv[0][0], event=ref_events[0].get_referred_object(), phase='P', dist_range=(30, 90))
+
+
+        stats = None
+        found_event = False
+        for event in event_cat:
+            if event.resource_id == ref_events[0]:
+                found_event = True
+                stats = rfstats(station=inv[0][0], event=event, phase='P', dist_range=(30, 90))
+
+        if not found_event:
+            print 'Event not in Catalogue'
 
         # Stats might be none if epicentral distance of earthquake is outside dist_range
         if not stats == None:
@@ -88,20 +100,17 @@ def process_RF(st, inv):
             rf_stream.filter('bandpass', freqmin=0.05, freqmax=1.)
             rf_stream.rf(method='P', trim=(-10, 30), downsample=50, deconvolve='time')
 
-            rf_stream.moveout()
-            rf_stream.ppoints(pp_depth=30)
             all_stn_RF.extend(rf_stream)
 
+    #all_stn_RF.sort(keys=['distance'])
+    all_stn_RF.select(station=station_name, component='Q').plot_rf(fillcolors=('k', 'gray'))
 
-    all_stn_RF.sort(keys=['distance'])
-    all_stn_RF.select(station=station_name, channel='BHL').plot_rf(fillcolors=(None, 'k'))
+
     return all_stn_RF
 
 
 
-ds.process(process_function=process_RF, output_filename=ASDF_out, tag_map={'extracted_unproc_quakes': 'receiver_function'})
-
-
+ds.process(process_function=process_RF, output_filename=ASDF_out, tag_map={'unproc_quake': 'receiver_function'})
 
 del ds
 print '\n'
